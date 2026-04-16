@@ -1,3 +1,53 @@
+# react-clone — Reactをゼロから再実装する学習プロジェクト
+
+## プロジェクトの目的
+
+Reactの原理を理解するために、最小限のReact互換ライブラリを自作する。動くものを作るのが目的ではなく、**内部で何が起きているかを手で触って理解する**のが目的。
+
+## 進め方
+
+- **コーチモードで少しずつ進める**（デフォルト）。一度に多くを実装しない。ユーザー（あさひ）に考えさせ、質問に答えさせながら進む
+- 型よりロジック優先。型はセーフティネットとして最低限で良い
+- 各ステップが終わったら `docs/` 配下に学習ノートを残す
+- コミットは `feat:` / `chore:` などの Conventional Commits、日本語で書く
+
+## 構成
+
+```
+apps/website            — createElement を呼んで動作確認する場所
+packages/myreact        — 自作Reactライブラリ本体（src/index.ts を直接 export、ビルドなし）
+packages/utils          — 元のスターターに付いてきたサンプル。触らない
+docs/NN-*.md            — ステップごとの学習ノート
+```
+
+`apps/website` → `myreact` の依存は `"myreact": "workspace:*"` で張っている。コード編集は即反映される。
+
+## 進捗
+
+`docs/` の番号付きファイルが学習の記録。次に読むときはここを見れば現在地がわかる。
+
+- [01-createElement-and-vdom.md](./docs/01-createElement-and-vdom.md) — ✅ createElement と仮想DOM（完了）
+
+## 次のステップ候補
+
+- **A. `render` を書く**: VDOMを実DOMに変換して `#root` に埋め込む関数。画面に描画できるようになる
+- **B. JSXを有効にする**: Vite+のコンパイラ設定で、`<div>` 記法を `myreact.createElement` 呼び出しに変換させる
+
+A→B の順がおすすめ。次回開始時にあさひに確認すること。
+
+## 既知の落とし穴
+
+- **pre-commit フック**: `vp check --fix` が lint-staged 経由で実行されると、Vite+側の問題で `vite.config.ts` 読み込みに失敗する（Node 20.19.6 を `^20.19.0` が満たさないと誤判定する）。単体で `vp check --fix` は通る。**対処**: `git commit --no-verify` で回避（ユーザー許可済み）
+- **ファイル `export` 形式**: `packages/myreact/package.json` の `exports` は `./src/index.ts` を直接指す。これは同じmonorepo内からの参照前提の設計。外部公開するなら tsdown でビルドを足す必要がある
+
+## 作業開始チェックリスト
+
+- [ ] `docs/` の最新ファイルを読んで現在地を把握
+- [ ] 次回の分岐（A or B）をユーザーに確認
+- [ ] コーチモードのスタンスを維持（すぐ答えを出さず、質問で考えさせる）
+
+---
+
 <!--VITE PLUS START-->
 
 # Using Vite+, the Unified Toolchain for the Web
