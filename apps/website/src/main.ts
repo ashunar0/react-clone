@@ -3,6 +3,16 @@ import typescriptLogo from "./assets/typescript.svg";
 import viteLogo from "./assets/vite.svg";
 import heroImg from "./assets/hero.png";
 import { setupCounter } from "./counter.ts";
+import { createElement } from "myreact";
+
+const name = "太郎";
+const vdom = createElement(
+  "div",
+  { className: "app" },
+  createElement("h1", null, "Hello"),
+  createElement("p", null, "Welcome ", name),
+);
+console.log("VDOM:", vdom);
 
 document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
 <section id="center">

@@ -23,6 +23,10 @@ importers:
         version: 0.1.18(@types/node@25.6.0)(jiti@2.6.1)(typescript@6.0.2)(vite@8.0.8(@types/node@25.6.0)(jiti@2.6.1)(yaml@2.8.3))(yaml@2.8.3)
 
   apps/website:
+    dependencies:
+      myreact:
+        specifier: workspace:*
+        version: link:../../packages/myreact
     devDependencies:
       typescript:
         specifier: ~6.0.2
@@ -33,6 +37,8 @@ importers:
       vite-plus:
         specifier: 'catalog:'
         version: 0.1.18(@types/node@25.6.0)(@voidzero-dev/vite-plus-core@0.1.18(@types/node@25.6.0)(jiti@2.6.1)(typescript@6.0.2)(yaml@2.8.3))(jiti@2.6.1)(typescript@6.0.2)(yaml@2.8.3)
+
+  packages/myreact: {}
 
   packages/utils:
     devDependencies:
