@@ -34,14 +34,16 @@ docs/NN-*.md            — ステップごとの学習ノート
 - [06-usestate-and-rerender.md](./docs/06-usestate-and-rerender.md) — ✅ useState と rerender（愚直版：全消し再描画）（完了）
 - [07-per-component-state.md](./docs/07-per-component-state.md) — ✅ コンポーネント別 state（path + Instance map、unmount 対応）（完了）
 - [08-reconciliation.md](./docs/08-reconciliation.md) — ✅ 差分更新（Fiber ツリー、DOM 再利用、props/children diff、DOM 並び替え）（完了）
+- [09-useeffect.md](./docs/09-useeffect.md) — ✅ useEffect と commit phase（pendingEffects、cleanup、deps 判定、unmount 時の cleanup。おまけで useState に関数 updater 追加）（完了）
 
 ## 次のステップ候補
 
-- **I. useEffect**: 副作用フック。マウント/更新/アンマウントのライフサイクル。依存配列で再実行制御
-- **F. Fragment**: `<>...</>` のサポート。軽い寄り道
+- **F. Fragment**: `<>...</>` のサポート。`type` に Symbol を足すだけの軽め
 - **J. key prop**: リストの並び替えで state を保つ。今は index 対応なので並び替えると state がズレる
+- **R. useRef**: DOM 参照と「再 render しない値の箱」。useEffect と相性が良い
+- **M. useMemo / useCallback**: 計算の memoize。deps の仕組みは useEffect と共通
 
-次回開始時にあさひに I / F / J のどれに進むか確認すること（I が本命、フック体系が完成に近づく）。
+次回開始時にあさひに F / J / R / M のどれに進むか確認すること。
 
 ## 既知の落とし穴
 
@@ -51,7 +53,7 @@ docs/NN-*.md            — ステップごとの学習ノート
 ## 作業開始チェックリスト
 
 - [ ] `docs/` の最新ファイルを読んで現在地を把握
-- [ ] 次回の分岐（I / F / J）をユーザーに確認
+- [ ] 次回の分岐（F / J / R / M）をユーザーに確認
 - [ ] コーチモードのスタンスを維持（すぐ答えを出さず、質問で考えさせる）
 
 ---

@@ -52,8 +52,19 @@ type Fiber = {
   dom: Node | null;
   // 子 Fiber。null はその位置に何も描画しない（conditional rendering）。
   children: (Fiber | null)[];
-  // 関数コンポーネントの useState の箱。それ以外は空で未使用。
+  // 関数コンポーネントの useState / useEffect の箱。
+  // useState は値、useEffect は EffectHook が入る（呼ばれた順のインデックス）。
   hooks: unknown[];
+  // reconcile 中に useEffect が積む「後で実行するリスト」。
+  // commit phase で flush される。毎 render ごとにリセット。
+  pendingEffects: Array<() => void>;
+};
+
+// useEffect が hooks に保存する記憶。次回 render で比較するための deps と、
+// 前回の effect が返した cleanup 関数を保持する。
+type EffectHook = {
+  deps: unknown[] | undefined;
+  cleanup: (() => void) | undefined;
 };
 
 // rerender() から参照する「頂点」の記録。
@@ -75,14 +86,18 @@ export function render(vdom: VNode, container: HTMLElement): void {
 
 // state 更新時などに呼ぶ。前回の rootFiber と新しい rootVNode を diff して
 // 必要最小限の DOM 操作で更新する（innerHTML="" で全消しはしない）。
+// reconcile（= render phase）が終わってから commit phase で useEffect を flush する。
 export function rerender(): void {
   if (!rootVNode || !rootContainer) return;
   rootFiber = reconcile(rootContainer, rootFiber, rootVNode);
+  if (rootFiber) commitEffects(rootFiber);
 }
 
 // 呼び出し順で currentFiber.hooks の箱を特定する。
 // if/for の中で呼ぶと順番が崩れて壊れるのは従来どおり。
-export function useState<T>(initial: T): [T, (newValue: T) => void] {
+// setter は値 or 関数を受け取る（関数の場合は前の値を引数に呼ばれる）。
+// setInterval のように古い closure から呼ばれても最新値を反映できる。
+export function useState<T>(initial: T): [T, (next: T | ((prev: T) => T)) => void] {
   if (!currentFiber) {
     throw new Error("useState must be called inside a function component");
   }
@@ -91,12 +106,65 @@ export function useState<T>(initial: T): [T, (newValue: T) => void] {
   if (fiber.hooks[currentIndex] === undefined) {
     fiber.hooks[currentIndex] = initial;
   }
-  const setState = (newValue: T) => {
-    fiber.hooks[currentIndex] = newValue;
+  const setState = (next: T | ((prev: T) => T)) => {
+    const prev = fiber.hooks[currentIndex] as T;
+    fiber.hooks[currentIndex] = typeof next === "function" ? (next as (p: T) => T)(prev) : next;
     rerender();
   };
   hookIndex++;
   return [fiber.hooks[currentIndex] as T, setState];
+}
+
+// 副作用フック。effect は commit phase（reconcile 後）で実行される。
+// deps が前回と変わっていれば、前回の cleanup を呼んでから新しい effect を実行する。
+// deps を省略すると毎回実行。deps === [] なら初回のみ。
+export function useEffect(effect: () => void | (() => void), deps?: unknown[]): void {
+  if (!currentFiber) {
+    throw new Error("useEffect must be called inside a function component");
+  }
+  const fiber = currentFiber;
+  const i = hookIndex;
+  const oldHook = fiber.hooks[i] as EffectHook | undefined;
+
+  const depsChanged = !oldHook || !sameDeps(oldHook.deps, deps);
+
+  if (depsChanged) {
+    fiber.pendingEffects.push(() => {
+      // 1. 前回の cleanup（あれば）
+      oldHook?.cleanup?.();
+      // 2. 新しい effect を実行し、返ってきた cleanup を hooks に記憶
+      const cleanup = effect();
+      fiber.hooks[i] = {
+        deps,
+        cleanup: typeof cleanup === "function" ? cleanup : undefined,
+      } satisfies EffectHook;
+    });
+  }
+
+  hookIndex++;
+}
+
+// 依存配列の等価判定。deps が undefined なら「毎回実行」扱いで常に false を返す。
+// 空配列同士は長さ 0 なので true（= スキップ）になる。
+function sameDeps(a: unknown[] | undefined, b: unknown[] | undefined): boolean {
+  if (a === undefined || b === undefined) return false;
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    if (a[i] !== b[i]) return false;
+  }
+  return true;
+}
+
+// Fiber ツリーを post-order で歩き、各 Fiber の pendingEffects を流す。
+// 子の effect を親より先に実行する（本家 React と同じ順序）。
+function commitEffects(fiber: Fiber): void {
+  for (const child of fiber.children) {
+    if (child) commitEffects(child);
+  }
+  for (const effect of fiber.pendingEffects) {
+    effect();
+  }
+  fiber.pendingEffects = [];
 }
 
 // 1 ノードの差分処理。旧 Fiber と新 VNode を突き合わせて Fiber を返す。
@@ -128,6 +196,7 @@ function reconcile(parentDom: Node, oldFiber: Fiber | null, newVNode: VNodeChild
       dom,
       children: [],
       hooks: [],
+      pendingEffects: [],
     };
   }
 
@@ -156,6 +225,7 @@ function mount(parentDom: Node, vnode: VNode): Fiber {
       dom: null,
       children: [],
       hooks: [],
+      pendingEffects: [],
     };
     const prevFiber = currentFiber;
     const prevHookIndex = hookIndex;
@@ -184,6 +254,7 @@ function mount(parentDom: Node, vnode: VNode): Fiber {
     dom,
     children,
     hooks: [],
+    pendingEffects: [],
   };
 }
 
@@ -264,15 +335,35 @@ function collectDoms(fiber: Fiber, result: Node[]): void {
   }
 }
 
-// fiber とその子孫の DOM を parentDom から取り除く。
+// fiber とその子孫を unmount する。useEffect の cleanup を呼んでから DOM を外す。
 function unmountFiber(fiber: Fiber, parentDom: Node): void {
+  runCleanups(fiber);
+  removeDoms(fiber, parentDom);
+}
+
+// Fiber ツリーを post-order で歩き、各 useEffect の cleanup を呼ぶ。
+// 子の cleanup を親より先に実行する（mount の逆順）。
+function runCleanups(fiber: Fiber): void {
+  for (const child of fiber.children) {
+    if (child) runCleanups(child);
+  }
+  for (const hook of fiber.hooks) {
+    if (hook && typeof hook === "object" && "cleanup" in hook) {
+      const cleanup = (hook as EffectHook).cleanup;
+      if (typeof cleanup === "function") cleanup();
+    }
+  }
+}
+
+// fiber とその子孫の DOM を parentDom から取り除く。
+function removeDoms(fiber: Fiber, parentDom: Node): void {
   if (fiber.dom) {
     parentDom.removeChild(fiber.dom);
     return;
   }
   // 関数コンポーネント：自身は DOM を持たないので子孫の DOM を再帰で除去
   for (const child of fiber.children) {
-    if (child) unmountFiber(child, parentDom);
+    if (child) removeDoms(child, parentDom);
   }
 }
 
