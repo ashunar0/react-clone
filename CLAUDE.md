@@ -33,14 +33,15 @@ docs/NN-*.md            — ステップごとの学習ノート
 - [05-function-component.md](./docs/05-function-component.md) — ✅ 関数コンポーネント対応、App.tsx / main.tsx 分離（完了）
 - [06-usestate-and-rerender.md](./docs/06-usestate-and-rerender.md) — ✅ useState と rerender（愚直版：全消し再描画）（完了）
 - [07-per-component-state.md](./docs/07-per-component-state.md) — ✅ コンポーネント別 state（path + Instance map、unmount 対応）（完了）
+- [08-reconciliation.md](./docs/08-reconciliation.md) — ✅ 差分更新（Fiber ツリー、DOM 再利用、props/children diff、DOM 並び替え）（完了）
 
 ## 次のステップ候補
 
-- **H. 差分更新（reconciliation）**: 愚直な全消し再描画を、前回 VDOM との差分計算に置き換える。本家 React の核。DOM を作り直さないので input のフォーカス等も保たれる
-- **F. Fragment 対応**: `<>...</>` を使えるようにする。軽い寄り道
-- **I. useEffect**: 副作用フック。マウント時・更新時・アンマウント時のライフサイクル
+- **I. useEffect**: 副作用フック。マウント/更新/アンマウントのライフサイクル。依存配列で再実行制御
+- **F. Fragment**: `<>...</>` のサポート。軽い寄り道
+- **J. key prop**: リストの並び替えで state を保つ。今は index 対応なので並び替えると state がズレる
 
-次回開始時にあさひに H / F / I のどれに進むか確認すること（H が本命、本家の最後のコア）。
+次回開始時にあさひに I / F / J のどれに進むか確認すること（I が本命、フック体系が完成に近づく）。
 
 ## 既知の落とし穴
 
@@ -50,7 +51,7 @@ docs/NN-*.md            — ステップごとの学習ノート
 ## 作業開始チェックリスト
 
 - [ ] `docs/` の最新ファイルを読んで現在地を把握
-- [ ] 次回の分岐（H / F / I）をユーザーに確認
+- [ ] 次回の分岐（I / F / J）をユーザーに確認
 - [ ] コーチモードのスタンスを維持（すぐ答えを出さず、質問で考えさせる）
 
 ---

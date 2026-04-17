@@ -13,8 +13,6 @@ export type VNodeChild = VNode | string | number | null | boolean | undefined;
 export type FunctionComponent<P = Record<string, unknown>> = (props: P) => VNode;
 
 // JSX を使うための最小限の型定義。
-// classic runtime では `<div>` が `createElement("div", ...)` に化けるので、
-// IntrinsicElements にタグ名があれば TS は通してくれる。
 declare global {
   namespace JSX {
     type Element = VNode;
@@ -39,123 +37,285 @@ export function createElement(
   };
 }
 
-// rerender() から参照する「頂点」の記録。
-// 最初の render() 呼び出し時にここにメモしておく。
-let rootVNode: VNode | null = null;
-let rootContainer: HTMLElement | null = null;
+// テキストノード（文字列/数値の子）を識別するための一意なマーカー。
+// string と被らないよう Symbol にする。
+const TEXT_TYPE = Symbol("TEXT");
 
-// コンポーネントインスタンス。Fiber の簡易版で、hooks を保持する。
-type Instance = {
-  type: FunctionComponent;
+// Fiber: Fiber 相当。前回描画した内容と対応する DOM、hooks を持つ。
+// DOM を作り直さず差分更新するために、前回の姿を保持しておく。
+type Fiber = {
+  // "div" などの tag、function component、TEXT_TYPE のいずれか。
+  type: string | FunctionComponent | typeof TEXT_TYPE;
+  // 前回描画した元の値。intrinsic なら VNode、TEXT なら文字列/数値。
+  vnode: VNodeChild;
+  // 対応する実 DOM。関数コンポーネント自身は DOM を持たないので null。
+  dom: Node | null;
+  // 子 Fiber。null はその位置に何も描画しない（conditional rendering）。
+  children: (Fiber | null)[];
+  // 関数コンポーネントの useState の箱。それ以外は空で未使用。
   hooks: unknown[];
 };
 
-// ツリー上の位置（path）をキーに Instance を管理する。
-// 例: "0" = root, "0.0" = root の 0 番目の子, "0.0.1" = ...
-const instances = new Map<string, Instance>();
-// 今回の render で到達した path 集合。render 終了後に未到達のものを削除（unmount）。
-const touchedPaths = new Set<string>();
+// rerender() から参照する「頂点」の記録。
+let rootVNode: VNode | null = null;
+let rootContainer: HTMLElement | null = null;
+// 前回の描画ツリー。reconcile の比較基準になる。
+let rootFiber: Fiber | null = null;
 
-// 「今どのコンポーネントの useState 呼び出しか」の追跡。
-let currentInstance: Instance | null = null;
+// useState が所属する関数コンポーネント Fiber の追跡。
+let currentFiber: Fiber | null = null;
 let hookIndex = 0;
 
-// 外部公開の render。root をメモしてから内部の renderNode に委譲する。
+// 外部公開の render。root をメモしてから reconcile で描画する。
 export function render(vdom: VNode, container: HTMLElement): void {
   rootVNode = vdom;
   rootContainer = container;
-  renderTree();
+  rerender();
 }
 
-// state が変化したとき等に呼ぶ。container を空にして root から描き直す（愚直版）。
+// state 更新時などに呼ぶ。前回の rootFiber と新しい rootVNode を diff して
+// 必要最小限の DOM 操作で更新する（innerHTML="" で全消しはしない）。
 export function rerender(): void {
   if (!rootVNode || !rootContainer) return;
-  rootContainer.innerHTML = "";
-  renderTree();
+  rootFiber = reconcile(rootContainer, rootFiber, rootVNode);
 }
 
-// render / rerender 共通の手続き。instance 追跡の初期化と unmount 後始末を担う。
-function renderTree(): void {
-  if (!rootVNode || !rootContainer) return;
-  touchedPaths.clear();
-  renderNode(rootVNode, rootContainer, "0");
-  // 今回 touch しなかった instance は unmount されたとみなして破棄。
-  for (const path of instances.keys()) {
-    if (!touchedPaths.has(path)) instances.delete(path);
-  }
-}
-
-// currentInstance.hooks[hookIndex] を自分の箱にする。
+// 呼び出し順で currentFiber.hooks の箱を特定する。
 // if/for の中で呼ぶと順番が崩れて壊れるのは従来どおり。
 export function useState<T>(initial: T): [T, (newValue: T) => void] {
-  if (!currentInstance) {
+  if (!currentFiber) {
     throw new Error("useState must be called inside a function component");
   }
-  const instance = currentInstance;
+  const fiber = currentFiber;
   const currentIndex = hookIndex;
-  if (instance.hooks[currentIndex] === undefined) {
-    instance.hooks[currentIndex] = initial;
+  if (fiber.hooks[currentIndex] === undefined) {
+    fiber.hooks[currentIndex] = initial;
   }
   const setState = (newValue: T) => {
-    instance.hooks[currentIndex] = newValue;
+    fiber.hooks[currentIndex] = newValue;
     rerender();
   };
   hookIndex++;
-  return [instance.hooks[currentIndex] as T, setState];
+  return [fiber.hooks[currentIndex] as T, setState];
 }
 
-// 再帰する本体。path で instance を引き、function component のときだけ
-// currentInstance / hookIndex を切り替える。
-function renderNode(vdom: VNode, container: HTMLElement, path: string): void {
-  // 関数コンポーネントなら、呼び出して返ってきた VNode を再 render する
-  if (typeof vdom.type === "function") {
-    touchedPaths.add(path);
-    // path が同じでも type が違えば別物扱い（前のは捨てる）
-    let instance = instances.get(path);
-    if (!instance || instance.type !== vdom.type) {
-      instance = { type: vdom.type, hooks: [] };
-      instances.set(path, instance);
+// 1 ノードの差分処理。旧 Fiber と新 VNode を突き合わせて Fiber を返す。
+// 4 ケース: mount / unmount / update / replace。
+function reconcile(parentDom: Node, oldFiber: Fiber | null, newVNode: VNodeChild): Fiber | null {
+  // null/boolean は「何も描画しない」。旧 Fiber があれば unmount。
+  if (newVNode == null || typeof newVNode === "boolean") {
+    if (oldFiber) unmountFiber(oldFiber, parentDom);
+    return null;
+  }
+
+  // 文字列/数値は TEXT ノード。
+  if (typeof newVNode === "string" || typeof newVNode === "number") {
+    const newText = String(newVNode);
+    if (oldFiber && oldFiber.type === TEXT_TYPE) {
+      // 同じ TEXT：内容が変わっていれば data だけ書き換え（ノードは再利用）
+      const node = oldFiber.dom as Text;
+      if (node.data !== newText) node.data = newText;
+      oldFiber.vnode = newVNode;
+      return oldFiber;
     }
-    // ネストした関数コンポーネントに備えて、親の状態をスタックに積む。
-    const prevInstance = currentInstance;
+    // 旧が違う型 → unmount してから新規 TEXT ノードを作る
+    if (oldFiber) unmountFiber(oldFiber, parentDom);
+    const dom = document.createTextNode(newText);
+    parentDom.appendChild(dom);
+    return {
+      type: TEXT_TYPE,
+      vnode: newVNode,
+      dom,
+      children: [],
+      hooks: [],
+    };
+  }
+
+  // ここから先は VNode（intrinsic or function component）。
+  const vnode = newVNode;
+
+  // 型が同じなら update（DOM 再利用 + props/children 差分）
+  if (oldFiber && oldFiber.type === vnode.type) {
+    if (typeof vnode.type === "function") {
+      return updateFunctionComponent(parentDom, oldFiber, vnode);
+    }
+    return updateIntrinsic(oldFiber, vnode);
+  }
+
+  // 型が違えば replace：旧 unmount → 新 mount
+  if (oldFiber) unmountFiber(oldFiber, parentDom);
+  return mount(parentDom, vnode);
+}
+
+// 新規マウント。DOM を作って parentDom に追加し、Fiber を返す。
+function mount(parentDom: Node, vnode: VNode): Fiber {
+  if (typeof vnode.type === "function") {
+    const fiber: Fiber = {
+      type: vnode.type,
+      vnode,
+      dom: null,
+      children: [],
+      hooks: [],
+    };
+    const prevFiber = currentFiber;
     const prevHookIndex = hookIndex;
-    currentInstance = instance;
+    currentFiber = fiber;
     hookIndex = 0;
-    const childVNode = vdom.type(vdom.props);
-    currentInstance = prevInstance;
+    const returned = vnode.type(vnode.props);
+    currentFiber = prevFiber;
     hookIndex = prevHookIndex;
-    renderNode(childVNode, container, `${path}.0`);
+    const childFiber = reconcile(parentDom, null, returned);
+    fiber.children = [childFiber];
+    return fiber;
+  }
+
+  // intrinsic: DOM を作り、props を適用、children を再帰的にマウント
+  const dom = document.createElement(vnode.type);
+  updateProps(dom, {}, vnode.props);
+  const children: (Fiber | null)[] = [];
+  for (const child of vnode.props.children) {
+    const childFiber = reconcile(dom, null, child);
+    children.push(childFiber);
+  }
+  parentDom.appendChild(dom);
+  return {
+    type: vnode.type,
+    vnode,
+    dom,
+    children,
+    hooks: [],
+  };
+}
+
+// 関数コンポーネントの update。hooks を引き継いで関数を呼び直し、戻り値を再帰 diff。
+function updateFunctionComponent(parentDom: Node, oldFiber: Fiber, vnode: VNode): Fiber {
+  const prevFiber = currentFiber;
+  const prevHookIndex = hookIndex;
+  currentFiber = oldFiber;
+  hookIndex = 0;
+  const returned = (vnode.type as FunctionComponent)(vnode.props);
+  currentFiber = prevFiber;
+  hookIndex = prevHookIndex;
+
+  const childFiber = reconcile(parentDom, oldFiber.children[0] ?? null, returned);
+  oldFiber.vnode = vnode;
+  oldFiber.children = [childFiber];
+  return oldFiber;
+}
+
+// intrinsic の update。DOM 再利用、props 差分、children 差分。
+function updateIntrinsic(oldFiber: Fiber, vnode: VNode): Fiber {
+  const dom = oldFiber.dom as HTMLElement;
+  const oldProps = (oldFiber.vnode as VNode).props;
+  updateProps(dom, oldProps, vnode.props);
+  const newChildren = reconcileChildren(dom, oldFiber.children, vnode.props.children);
+  oldFiber.vnode = vnode;
+  oldFiber.children = newChildren;
+  return oldFiber;
+}
+
+// children の差分。インデックスで対応づけて reconcile、最後に DOM 順を揃える。
+function reconcileChildren(
+  parentDom: Node,
+  oldChildren: (Fiber | null)[],
+  newChildren: VNodeChild[],
+): (Fiber | null)[] {
+  // 新にない余剰の旧 Fiber は unmount
+  for (let i = newChildren.length; i < oldChildren.length; i++) {
+    const oldFiber = oldChildren[i];
+    if (oldFiber) unmountFiber(oldFiber, parentDom);
+  }
+
+  const result: (Fiber | null)[] = [];
+  for (let i = 0; i < newChildren.length; i++) {
+    const oldFiber = oldChildren[i] ?? null;
+    const childFiber = reconcile(parentDom, oldFiber, newChildren[i]);
+    result.push(childFiber);
+  }
+
+  // DOM の並びを fiber の順序と一致させる（insert や再表示で必要）
+  reorderChildren(parentDom, result);
+  return result;
+}
+
+// fiber の並び順に合わせて parentDom の実 DOM 順を揃える。
+function reorderChildren(parentDom: Node, children: (Fiber | null)[]): void {
+  const expected: Node[] = [];
+  for (const fiber of children) {
+    if (fiber) collectDoms(fiber, expected);
+  }
+  for (let i = 0; i < expected.length; i++) {
+    const want = expected[i];
+    const actual = parentDom.childNodes[i];
+    if (actual !== want) {
+      parentDom.insertBefore(want, actual ?? null);
+    }
+  }
+}
+
+// fiber の直下にぶら下がる実 DOM を収集（関数コンポーネントは DOM を持たないので子を辿る）
+function collectDoms(fiber: Fiber, result: Node[]): void {
+  if (fiber.dom) {
+    result.push(fiber.dom);
     return;
   }
+  for (const child of fiber.children) {
+    if (child) collectDoms(child, result);
+  }
+}
 
-  const el = document.createElement(vdom.type);
+// fiber とその子孫の DOM を parentDom から取り除く。
+function unmountFiber(fiber: Fiber, parentDom: Node): void {
+  if (fiber.dom) {
+    parentDom.removeChild(fiber.dom);
+    return;
+  }
+  // 関数コンポーネント：自身は DOM を持たないので子孫の DOM を再帰で除去
+  for (const child of fiber.children) {
+    if (child) unmountFiber(child, parentDom);
+  }
+}
 
-  // props を DOM 要素に反映する（イベント / class / その他属性）
-  for (const [key, value] of Object.entries(vdom.props)) {
+// props の差分適用。消えたもの・変わったものだけ DOM を操作する。
+function updateProps(
+  dom: HTMLElement,
+  oldProps: Record<string, unknown>,
+  newProps: Record<string, unknown>,
+): void {
+  // 旧にあって新に無い or 値が変わった → 旧を外す
+  for (const key of Object.keys(oldProps)) {
     if (key === "children") continue;
-
-    if (key.startsWith("on") && typeof value === "function") {
-      const eventName = key.slice(2).toLowerCase();
-      el.addEventListener(eventName, value as EventListener);
-    } else if (key === "className") {
-      el.setAttribute("class", String(value));
-    } else {
-      el.setAttribute(key, String(value));
+    if (!(key in newProps) || oldProps[key] !== newProps[key]) {
+      removeProp(dom, key, oldProps[key]);
     }
   }
-
-  // children を再帰的に処理して実DOMにぶら下げる
-  const children = vdom.props.children;
-  for (let i = 0; i < children.length; i++) {
-    const child = children[i];
-    // null / false / undefined は何も描画しない（position は消費するので i は進める）
-    if (child == null || child === false || child === true) continue;
-    if (typeof child === "string" || typeof child === "number") {
-      el.appendChild(document.createTextNode(String(child)));
-    } else {
-      renderNode(child, el, `${path}.${i}`);
+  // 新で変わった or 追加された → 新を付ける
+  for (const key of Object.keys(newProps)) {
+    if (key === "children") continue;
+    if (oldProps[key] !== newProps[key]) {
+      setProp(dom, key, newProps[key]);
     }
   }
+}
 
-  container.appendChild(el);
+function setProp(dom: HTMLElement, key: string, value: unknown): void {
+  if (key.startsWith("on") && typeof value === "function") {
+    const eventName = key.slice(2).toLowerCase();
+    dom.addEventListener(eventName, value as EventListener);
+  } else if (key === "className") {
+    dom.setAttribute("class", String(value));
+  } else {
+    dom.setAttribute(key, String(value));
+  }
+}
+
+function removeProp(dom: HTMLElement, key: string, value: unknown): void {
+  if (key.startsWith("on") && typeof value === "function") {
+    const eventName = key.slice(2).toLowerCase();
+    dom.removeEventListener(eventName, value as EventListener);
+  } else if (key === "className") {
+    dom.removeAttribute("class");
+  } else {
+    dom.removeAttribute(key);
+  }
 }
