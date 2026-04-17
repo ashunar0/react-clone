@@ -1,10 +1,10 @@
-import { createElement, type VNode, type VNodeChild } from "./index.ts";
+import { createElement, type FunctionComponent, type VNode, type VNodeChild } from "./index.ts";
 
 // automatic runtime が呼ぶ関数。
 // `<div>Hello</div>` → `jsx("div", { children: "Hello" })`
 // `createElement` と違って children は props の中に入ってくる。
 export function jsx(
-  type: string,
+  type: string | FunctionComponent,
   props: Record<string, unknown> & { children?: VNodeChild | VNodeChild[] },
 ): VNode {
   const { children, ...rest } = props;

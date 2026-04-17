@@ -1,5 +1,5 @@
 export type VNode = {
-  type: string;
+  type: string | FunctionComponent;
   props: {
     [key: string]: unknown;
     children: VNodeChild[];
@@ -7,6 +7,9 @@ export type VNode = {
 };
 
 export type VNodeChild = VNode | string | number;
+
+// 関数コンポーネント。props を受け取って VNode を返す関数。
+export type FunctionComponent<P = Record<string, unknown>> = (props: P) => VNode;
 
 // JSX を使うための最小限の型定義。
 // classic runtime では `<div>` が `createElement("div", ...)` に化けるので、
@@ -22,7 +25,7 @@ declare global {
 
 // vdom を作成する
 export function createElement(
-  type: string,
+  type: string | FunctionComponent,
   props: Record<string, unknown> | null,
   ...children: VNodeChild[]
 ): VNode {
@@ -37,6 +40,13 @@ export function createElement(
 
 // vdom を実DOMに変換して container に追加する
 export function render(vdom: VNode, container: HTMLElement): void {
+  // 関数コンポーネントなら、呼び出して返ってきた VNode を再 render する
+  if (typeof vdom.type === "function") {
+    const childVNode = vdom.type(vdom.props);
+    render(childVNode, container);
+    return;
+  }
+
   const el = document.createElement(vdom.type);
 
   // props を DOM 要素に反映する（イベント / class / その他属性）

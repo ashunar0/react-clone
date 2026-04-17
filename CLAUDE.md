@@ -30,14 +30,14 @@ docs/NN-*.md            — ステップごとの学習ノート
 - [02-render.md](./docs/02-render.md) — ✅ render で VDOM を実DOMに変換、`#root` に描画（完了）
 - [03-props.md](./docs/03-props.md) — ✅ props を実DOMに反映（className / id / onClick）（完了）
 - [04-jsx.md](./docs/04-jsx.md) — ✅ JSX を有効化（automatic runtime + myreact/jsx-runtime）（完了）
+- [05-function-component.md](./docs/05-function-component.md) — ✅ 関数コンポーネント対応、App.tsx / main.tsx 分離（完了）
 
 ## 次のステップ候補
 
-- **D. 関数コンポーネントに対応する**: `type` に文字列だけでなく関数も渡せるようにする。`<App />` の形
 - **E. state と再描画**: `useState` 的なものを作る。差分更新（reconciliation）が必要になる
 - **F. Fragment 対応**: `<>...</>` を使えるようにする。`render` が Symbol 型の `type` を判別できるようにするだけ
 
-次回開始時にあさひに D / E / F のどれに進むか確認すること。
+次回開始時にあさひに E / F のどれに進むか確認すること（E が本命、F は軽い寄り道）。
 
 ## 既知の落とし穴
 
@@ -47,7 +47,7 @@ docs/NN-*.md            — ステップごとの学習ノート
 ## 作業開始チェックリスト
 
 - [ ] `docs/` の最新ファイルを読んで現在地を把握
-- [ ] 次回の分岐（D / E / F）をユーザーに確認
+- [ ] 次回の分岐（E / F）をユーザーに確認
 - [ ] コーチモードのスタンスを維持（すぐ答えを出さず、質問で考えさせる）
 
 ---
