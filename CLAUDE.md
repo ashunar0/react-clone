@@ -31,13 +31,15 @@ docs/NN-*.md            — ステップごとの学習ノート
 - [03-props.md](./docs/03-props.md) — ✅ props を実DOMに反映（className / id / onClick）（完了）
 - [04-jsx.md](./docs/04-jsx.md) — ✅ JSX を有効化（automatic runtime + myreact/jsx-runtime）（完了）
 - [05-function-component.md](./docs/05-function-component.md) — ✅ 関数コンポーネント対応、App.tsx / main.tsx 分離（完了）
+- [06-usestate-and-rerender.md](./docs/06-usestate-and-rerender.md) — ✅ useState と rerender（愚直版：全消し再描画）（完了）
 
 ## 次のステップ候補
 
-- **E. state と再描画**: `useState` 的なものを作る。差分更新（reconciliation）が必要になる
-- **F. Fragment 対応**: `<>...</>` を使えるようにする。`render` が Symbol 型の `type` を判別できるようにするだけ
+- **G. コンポーネント別 state**: 現状は `states[]` がグローバル1本なので複数コンポーネントで壊れる。Fiber 相当の「コンポーネント単位で state を持つ」構造にリファクタ
+- **H. 差分更新（reconciliation）**: 愚直な全消し再描画を、前回 VDOM との差分計算に置き換える。本家 React の核
+- **F. Fragment 対応**: `<>...</>` を使えるようにする。軽い寄り道
 
-次回開始時にあさひに E / F のどれに進むか確認すること（E が本命、F は軽い寄り道）。
+次回開始時にあさひに G / H / F のどれに進むか確認すること（G→H が自然な流れ）。
 
 ## 既知の落とし穴
 
@@ -47,7 +49,7 @@ docs/NN-*.md            — ステップごとの学習ノート
 ## 作業開始チェックリスト
 
 - [ ] `docs/` の最新ファイルを読んで現在地を把握
-- [ ] 次回の分岐（E / F）をユーザーに確認
+- [ ] 次回の分岐（G / H / F）をユーザーに確認
 - [ ] コーチモードのスタンスを維持（すぐ答えを出さず、質問で考えさせる）
 
 ---
