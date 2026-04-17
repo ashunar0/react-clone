@@ -8,6 +8,18 @@ export type VNode = {
 
 export type VNodeChild = VNode | string | number;
 
+// JSX を使うための最小限の型定義。
+// classic runtime では `<div>` が `createElement("div", ...)` に化けるので、
+// IntrinsicElements にタグ名があれば TS は通してくれる。
+declare global {
+  namespace JSX {
+    type Element = VNode;
+    interface IntrinsicElements {
+      [elemName: string]: Record<string, unknown>;
+    }
+  }
+}
+
 // vdom を作成する
 export function createElement(
   type: string,

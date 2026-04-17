@@ -6,6 +6,10 @@
     "types": ["vite/client"],
     "skipLibCheck": true,
 
+    /* JSX (automatic runtime) */
+    "jsx": "react-jsx",
+    "jsxImportSource": "myreact",
+
     /* Bundler mode */
     "moduleResolution": "bundler",
     "allowImportingTsExtensions": true,

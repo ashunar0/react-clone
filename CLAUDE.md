@@ -29,14 +29,15 @@ docs/NN-*.md            — ステップごとの学習ノート
 - [01-createElement-and-vdom.md](./docs/01-createElement-and-vdom.md) — ✅ createElement と仮想DOM（完了）
 - [02-render.md](./docs/02-render.md) — ✅ render で VDOM を実DOMに変換、`#root` に描画（完了）
 - [03-props.md](./docs/03-props.md) — ✅ props を実DOMに反映（className / id / onClick）（完了）
+- [04-jsx.md](./docs/04-jsx.md) — ✅ JSX を有効化（automatic runtime + myreact/jsx-runtime）（完了）
 
 ## 次のステップ候補
 
-- **B. JSXを有効にする**: Vite+のコンパイラ設定で、`<div>` 記法を `myreact.createElement` 呼び出しに変換させる
-- **D. 関数コンポーネントに対応する**: `type` に文字列だけでなく関数も渡せるようにする
+- **D. 関数コンポーネントに対応する**: `type` に文字列だけでなく関数も渡せるようにする。`<App />` の形
 - **E. state と再描画**: `useState` 的なものを作る。差分更新（reconciliation）が必要になる
+- **F. Fragment 対応**: `<>...</>` を使えるようにする。`render` が Symbol 型の `type` を判別できるようにするだけ
 
-次回開始時にあさひに B / D / E のどれに進むか確認すること。
+次回開始時にあさひに D / E / F のどれに進むか確認すること。
 
 ## 既知の落とし穴
 
@@ -46,7 +47,7 @@ docs/NN-*.md            — ステップごとの学習ノート
 ## 作業開始チェックリスト
 
 - [ ] `docs/` の最新ファイルを読んで現在地を把握
-- [ ] 次回の分岐（B / D / E）をユーザーに確認
+- [ ] 次回の分岐（D / E / F）をユーザーに確認
 - [ ] コーチモードのスタンスを維持（すぐ答えを出さず、質問で考えさせる）
 
 ---

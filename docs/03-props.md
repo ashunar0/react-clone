@@ -6,21 +6,21 @@
 
 props を DOM に反映する方法は、大きく分けて3種類ある:
 
-| API | 用途 | 例 |
-|-----|------|----|
-| `el.setAttribute(name, value)` | HTML属性をセット | `el.setAttribute("id", "main")` |
+| API                              | 用途               | 例                                      |
+| -------------------------------- | ------------------ | --------------------------------------- |
+| `el.setAttribute(name, value)`   | HTML属性をセット   | `el.setAttribute("id", "main")`         |
 | `el.addEventListener(event, fn)` | イベントを仕掛ける | `el.addEventListener("click", handler)` |
-| `el[key] = value` | プロパティ代入 | `el.disabled = true` |
+| `el[key] = value`                | プロパティ代入     | `el.disabled = true`                    |
 
 ### 属性 (Attribute) とプロパティ (Property) の違い
 
 紛らわしいが別物:
 
-|  | 属性 (Attribute) | プロパティ (Property) |
-|---|---|---|
-| どこ | HTML の文字列 | JSオブジェクトのフィールド |
-| 型 | 常に文字列 | 真偽値・数値・関数もOK |
-| API | `setAttribute` / `getAttribute` | `el.xxx` で直接 |
+|      | 属性 (Attribute)                | プロパティ (Property)      |
+| ---- | ------------------------------- | -------------------------- |
+| どこ | HTML の文字列                   | JSオブジェクトのフィールド |
+| 型   | 常に文字列                      | 真偽値・数値・関数もOK     |
+| API  | `setAttribute` / `getAttribute` | `el.xxx` で直接            |
 
 今回の v1 では `disabled` のような真偽値系も `setAttribute` で統一する（`setAttribute("disabled", "true")` でもブラウザは disabled と解釈してくれる）。プロパティ代入が必要になったら後で分岐を足す。
 
@@ -51,8 +51,8 @@ render 内で `Object.entries(props)` してループしつつ、キーを**4分
 `addEventListener` は `"click"`, `"input"` みたいな**小文字・`on`なし**の名前を受ける:
 
 ```ts
-"onClick".slice(2)         // "Click"
-"onClick".slice(2).toLowerCase()  // "click"
+"onClick".slice(2); // "Click"
+"onClick".slice(2).toLowerCase(); // "click"
 ```
 
 - `slice(2)` で先頭の `"on"` を削る

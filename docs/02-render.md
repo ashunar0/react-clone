@@ -5,7 +5,7 @@
 ## render のシグネチャ
 
 ```ts
-function render(vdom: VNode, container: HTMLElement): void
+function render(vdom: VNode, container: HTMLElement): void;
 ```
 
 - **第1引数 `vdom`**: `createElement` で作ったVNodeオブジェクト
@@ -16,11 +16,11 @@ function render(vdom: VNode, container: HTMLElement): void
 
 実DOMの組み立てには Vanilla JS の3つだけで足りる:
 
-| API | 用途 |
-|-----|------|
-| `document.createElement(tagName)` | 要素ノードを作る（`<div>` など） |
-| `document.createTextNode(text)` | テキストノードを作る（"Hello" など） |
-| `parent.appendChild(child)` | 子ノードを親に繋ぐ |
+| API                               | 用途                                 |
+| --------------------------------- | ------------------------------------ |
+| `document.createElement(tagName)` | 要素ノードを作る（`<div>` など）     |
+| `document.createTextNode(text)`   | テキストノードを作る（"Hello" など） |
+| `parent.appendChild(child)`       | 子ノードを親に繋ぐ                   |
 
 DOMは「Nodeのツリー」で、要素ノードもテキストノードも同じ `Node` 型として `appendChild` で繋げる。
 

@@ -5,6 +5,8 @@
     "moduleDetection": "force",
     "module": "preserve",
     "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "noEmit": true,
     "strict": true,
     "noUnusedLocals": true,
     "esModuleInterop": true,
