@@ -32,14 +32,15 @@ docs/NN-*.md            — ステップごとの学習ノート
 - [04-jsx.md](./docs/04-jsx.md) — ✅ JSX を有効化（automatic runtime + myreact/jsx-runtime）（完了）
 - [05-function-component.md](./docs/05-function-component.md) — ✅ 関数コンポーネント対応、App.tsx / main.tsx 分離（完了）
 - [06-usestate-and-rerender.md](./docs/06-usestate-and-rerender.md) — ✅ useState と rerender（愚直版：全消し再描画）（完了）
+- [07-per-component-state.md](./docs/07-per-component-state.md) — ✅ コンポーネント別 state（path + Instance map、unmount 対応）（完了）
 
 ## 次のステップ候補
 
-- **G. コンポーネント別 state**: 現状は `states[]` がグローバル1本なので複数コンポーネントで壊れる。Fiber 相当の「コンポーネント単位で state を持つ」構造にリファクタ
-- **H. 差分更新（reconciliation）**: 愚直な全消し再描画を、前回 VDOM との差分計算に置き換える。本家 React の核
+- **H. 差分更新（reconciliation）**: 愚直な全消し再描画を、前回 VDOM との差分計算に置き換える。本家 React の核。DOM を作り直さないので input のフォーカス等も保たれる
 - **F. Fragment 対応**: `<>...</>` を使えるようにする。軽い寄り道
+- **I. useEffect**: 副作用フック。マウント時・更新時・アンマウント時のライフサイクル
 
-次回開始時にあさひに G / H / F のどれに進むか確認すること（G→H が自然な流れ）。
+次回開始時にあさひに H / F / I のどれに進むか確認すること（H が本命、本家の最後のコア）。
 
 ## 既知の落とし穴
 
@@ -49,7 +50,7 @@ docs/NN-*.md            — ステップごとの学習ノート
 ## 作業開始チェックリスト
 
 - [ ] `docs/` の最新ファイルを読んで現在地を把握
-- [ ] 次回の分岐（G / H / F）をユーザーに確認
+- [ ] 次回の分岐（H / F / I）をユーザーに確認
 - [ ] コーチモードのスタンスを維持（すぐ答えを出さず、質問で考えさせる）
 
 ---
