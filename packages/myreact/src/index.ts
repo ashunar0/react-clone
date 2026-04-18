@@ -1,5 +1,5 @@
 export type VNode = {
-  type: string | FunctionComponent;
+  type: string | FunctionComponent | typeof FRAGMENT_TYPE;
   props: {
     [key: string]: unknown;
     children: VNodeChild[];
@@ -24,7 +24,7 @@ declare global {
 
 // vdom を作成する
 export function createElement(
-  type: string | FunctionComponent,
+  type: string | FunctionComponent | typeof FRAGMENT_TYPE,
   props: Record<string, unknown> | null,
   ...children: VNodeChild[]
 ): VNode {
@@ -41,11 +41,15 @@ export function createElement(
 // string と被らないよう Symbol にする。
 const TEXT_TYPE = Symbol("TEXT");
 
+// Fragment 用の一意なマーカー。DOM を作らず children だけを親に並べる。
+// jsx-runtime から import される（`<>...</>` のコンパイル結果で type に入る）。
+export const FRAGMENT_TYPE = Symbol("FRAGMENT");
+
 // Fiber: Fiber 相当。前回描画した内容と対応する DOM、hooks を持つ。
 // DOM を作り直さず差分更新するために、前回の姿を保持しておく。
 type Fiber = {
-  // "div" などの tag、function component、TEXT_TYPE のいずれか。
-  type: string | FunctionComponent | typeof TEXT_TYPE;
+  // "div" などの tag、function component、TEXT_TYPE、FRAGMENT_TYPE のいずれか。
+  type: string | FunctionComponent | typeof TEXT_TYPE | typeof FRAGMENT_TYPE;
   // 前回描画した元の値。intrinsic なら VNode、TEXT なら文字列/数値。
   vnode: VNodeChild;
   // 対応する実 DOM。関数コンポーネント自身は DOM を持たないので null。
@@ -208,6 +212,9 @@ function reconcile(parentDom: Node, oldFiber: Fiber | null, newVNode: VNodeChild
     if (typeof vnode.type === "function") {
       return updateFunctionComponent(parentDom, oldFiber, vnode);
     }
+    if (vnode.type === FRAGMENT_TYPE) {
+      return updateFragment(parentDom, oldFiber, vnode);
+    }
     return updateIntrinsic(oldFiber, vnode);
   }
 
@@ -239,6 +246,22 @@ function mount(parentDom: Node, vnode: VNode): Fiber {
     return fiber;
   }
 
+  // Fragment: 自身は DOM を持たず、children を parentDom に直接並べる。
+  if (vnode.type === FRAGMENT_TYPE) {
+    const children: (Fiber | null)[] = [];
+    for (const child of vnode.props.children) {
+      children.push(reconcile(parentDom, null, child));
+    }
+    return {
+      type: FRAGMENT_TYPE,
+      vnode,
+      dom: null,
+      children,
+      hooks: [],
+      pendingEffects: [],
+    };
+  }
+
   // intrinsic: DOM を作り、props を適用、children を再帰的にマウント
   const dom = document.createElement(vnode.type);
   updateProps(dom, {}, vnode.props);
@@ -256,6 +279,30 @@ function mount(parentDom: Node, vnode: VNode): Fiber {
     hooks: [],
     pendingEffects: [],
   };
+}
+
+// Fragment の update。自身は DOM を持たないので parentDom に直接 children を reconcile。
+// DOM の並び替えは親（intrinsic）の reorderChildren に任せる。
+// collectDoms が dom: null の fiber を再帰で展開してくれるので、
+// Fragment の子も親の childNodes として正しく並ぶ。
+function updateFragment(parentDom: Node, oldFiber: Fiber, vnode: VNode): Fiber {
+  const oldChildren = oldFiber.children;
+  const newChildren = vnode.props.children;
+
+  // 新にない余剰の旧 Fiber は unmount
+  for (let i = newChildren.length; i < oldChildren.length; i++) {
+    const old = oldChildren[i];
+    if (old) unmountFiber(old, parentDom);
+  }
+
+  const result: (Fiber | null)[] = [];
+  for (let i = 0; i < newChildren.length; i++) {
+    result.push(reconcile(parentDom, oldChildren[i] ?? null, newChildren[i]));
+  }
+
+  oldFiber.vnode = vnode;
+  oldFiber.children = result;
+  return oldFiber;
 }
 
 // 関数コンポーネントの update。hooks を引き継いで関数を呼び直し、戻り値を再帰 diff。

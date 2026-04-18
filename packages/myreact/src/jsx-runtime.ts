@@ -1,10 +1,16 @@
-import { createElement, type FunctionComponent, type VNode, type VNodeChild } from "./index.ts";
+import {
+  createElement,
+  FRAGMENT_TYPE,
+  type FunctionComponent,
+  type VNode,
+  type VNodeChild,
+} from "./index.ts";
 
 // automatic runtime が呼ぶ関数。
 // `<div>Hello</div>` → `jsx("div", { children: "Hello" })`
 // `createElement` と違って children は props の中に入ってくる。
 export function jsx(
-  type: string | FunctionComponent,
+  type: string | FunctionComponent | typeof FRAGMENT_TYPE,
   props: Record<string, unknown> & { children?: VNodeChild | VNodeChild[] },
 ): VNode {
   const { children, ...rest } = props;
@@ -17,5 +23,5 @@ export function jsx(
 // myreact では挙動の違いが無いので jsx と同じ実装でよい。
 export const jsxs = jsx;
 
-// `<>...</>` 用。現状は未対応（render が string 以外の type を扱えない）。
-export const Fragment = "myreact.Fragment";
+// `<>...</>` 用。index.ts の reconcile が FRAGMENT_TYPE を認識して扱う。
+export { FRAGMENT_TYPE as Fragment };
