@@ -35,6 +35,7 @@ docs/NN-*.md            — ステップごとの学習ノート
 - [07-per-component-state.md](./docs/07-per-component-state.md) — ✅ コンポーネント別 state（path + Instance map、unmount 対応）（完了）
 - [08-reconciliation.md](./docs/08-reconciliation.md) — ✅ 差分更新（Fiber ツリー、DOM 再利用、props/children diff、DOM 並び替え）（完了）
 - [09-useeffect.md](./docs/09-useeffect.md) — ✅ useEffect と commit phase（pendingEffects、cleanup、deps 判定、unmount 時の cleanup。おまけで useState に関数 updater 追加）（完了）
+- [10-fiber-deep-dive.md](./docs/10-fiber-deep-dive.md) — ✅ 概念整理（VDOM と Fiber の違い、hooks の配列/連結リスト、double buffering、RSC の本当の理由、signals/atom の位置づけ、各フレームワークの戦略）（完了・実装追加なし）
 
 ## 次のステップ候補
 
