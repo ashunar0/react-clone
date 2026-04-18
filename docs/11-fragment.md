@@ -14,7 +14,11 @@ function Row() {
   );
 }
 
-<table><tr><Row /></tr></table>
+<table>
+  <tr>
+    <Row />
+  </tr>
+</table>;
 ```
 
 Row が返すものを `<div>` で包むと、`<tr>` の直下に `<div>` が挟まる構造になる。HTML 仕様的に不正（`<tr>` の直下に許されるのは `<td>` / `<th>`）で、ブラウザによっては div が外に弾き出されて DOM が壊れる。
@@ -31,12 +35,12 @@ Row が返すものを `<div>` で包むと、`<tr>` の直下に `<div>` が挟
 
 Fragment は既存の 4 つのケース（intrinsic / 関数コンポーネント / TEXT / null）の中で、**関数コンポーネント**と挙動が近い。
 
-| 処理                         | 関数コンポーネント          | Fragment                          |
-| ---------------------------- | --------------------------- | --------------------------------- |
-| 自身の DOM を作る？          | しない（`dom: null`）       | しない（`dom: null`）             |
-| 子はどう得る？               | `vnode.type(props)` を呼ぶ  | `vnode.props.children` の配列     |
-| 子を並べる先は？             | 受け取った `parentDom`      | 受け取った `parentDom`            |
-| hooks / state を持つ？       | 持つ                        | 持たない                          |
+| 処理                   | 関数コンポーネント         | Fragment                      |
+| ---------------------- | -------------------------- | ----------------------------- |
+| 自身の DOM を作る？    | しない（`dom: null`）      | しない（`dom: null`）         |
+| 子はどう得る？         | `vnode.type(props)` を呼ぶ | `vnode.props.children` の配列 |
+| 子を並べる先は？       | 受け取った `parentDom`     | 受け取った `parentDom`        |
+| hooks / state を持つ？ | 持つ                       | 持たない                      |
 
 違いは「children を関数呼び出しで得るか、すでに props にある配列か」だけ。**自身は DOM を持たず、受け取った `parentDom` に children を直接並べる**という核の部分は同じ。
 
@@ -73,7 +77,7 @@ if (vnode.type === FRAGMENT_TYPE) {
   return {
     type: FRAGMENT_TYPE,
     vnode,
-    dom: null,       // ← Fragment 自身は DOM を持たない
+    dom: null, // ← Fragment 自身は DOM を持たない
     children,
     hooks: [],
     pendingEffects: [],
@@ -161,8 +165,12 @@ function App() {
       <button onClick={() => setCount(count + 1)}>+1</button>
       <table>
         <tbody>
-          <tr><TableRow name="Alice" age={count} /></tr>
-          <tr><TableRow name="Bob" age={count * 2} /></tr>
+          <tr>
+            <TableRow name="Alice" age={count} />
+          </tr>
+          <tr>
+            <TableRow name="Bob" age={count * 2} />
+          </tr>
         </tbody>
       </table>
     </>

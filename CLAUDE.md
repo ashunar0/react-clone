@@ -37,14 +37,15 @@ docs/NN-*.md            — ステップごとの学習ノート
 - [09-useeffect.md](./docs/09-useeffect.md) — ✅ useEffect と commit phase（pendingEffects、cleanup、deps 判定、unmount 時の cleanup。おまけで useState に関数 updater 追加）（完了）
 - [10-fiber-deep-dive.md](./docs/10-fiber-deep-dive.md) — ✅ 概念整理（VDOM と Fiber の違い、hooks の配列/連結リスト、double buffering、RSC の本当の理由、signals/atom の位置づけ、各フレームワークの戦略）（完了・実装追加なし）
 - [11-fragment.md](./docs/11-fragment.md) — ✅ Fragment（`<>...</>`）対応（`FRAGMENT_TYPE` Symbol、自身は DOM なし、並び替えは親の `reorderChildren` に委譲）（完了）
+- [12-key.md](./docs/12-key.md) — ✅ key prop 対応（VNode/Fiber に key、`diffChildren` で Map lookup、`k:<key>` と `i:<index>` の prefix で衝突回避、reorder は intrinsic のみ）（完了）
 
 ## 次のステップ候補
 
-- **J. key prop**: リストの並び替えで state を保つ。今は index 対応なので並び替えると state がズレる
 - **R. useRef**: DOM 参照と「再 render しない値の箱」。useEffect と相性が良い
 - **M. useMemo / useCallback**: 計算の memoize。deps の仕組みは useEffect と共通
+- **U. useContext**: ツリーを降るデータ伝搬。関数コンポーネントの fiber とセットで設計すると面白い
 
-次回開始時にあさひに J / R / M のどれに進むか確認すること。
+次回開始時にあさひに R / M / U のどれに進むか確認すること。
 
 ## 既知の落とし穴
 

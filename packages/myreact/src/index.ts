@@ -4,6 +4,9 @@ export type VNode = {
     [key: string]: unknown;
     children: VNodeChild[];
   };
+  // reconcile 中に同じ兄弟の old/new を対応づけるための識別子。
+  // props からは切り出される（コンポーネントからは見えない）。
+  key: string | number | null;
 };
 
 // null / false / undefined は「何も描画しない」。React と同じ挙動。
@@ -13,9 +16,14 @@ export type VNodeChild = VNode | string | number | null | boolean | undefined;
 export type FunctionComponent<P = Record<string, unknown>> = (props: P) => VNode;
 
 // JSX を使うための最小限の型定義。
+// IntrinsicAttributes は intrinsic / 関数コンポーネント共通で受け取れる特殊 props。
+// key はここに置くことで、各コンポーネントの props 型定義に混ぜずに済む。
 declare global {
   namespace JSX {
     type Element = VNode;
+    interface IntrinsicAttributes {
+      key?: string | number;
+    }
     interface IntrinsicElements {
       [elemName: string]: Record<string, unknown>;
     }
@@ -28,12 +36,16 @@ export function createElement(
   props: Record<string, unknown> | null,
   ...children: VNodeChild[]
 ): VNode {
+  const { key, ...rest } = (props ?? {}) as Record<string, unknown> & {
+    key?: string | number | null;
+  };
   return {
     type,
     props: {
-      ...props,
+      ...rest,
       children,
     },
+    key: key ?? null,
   };
 }
 
@@ -62,6 +74,9 @@ type Fiber = {
   // reconcile 中に useEffect が積む「後で実行するリスト」。
   // commit phase で flush される。毎 render ごとにリセット。
   pendingEffects: Array<() => void>;
+  // 兄弟の中で自分を特定する key。並び替えや削除で DOM/state を保つのに使う。
+  // TEXT は常に null（key を持たない）、それ以外は VNode.key を引き継ぐ。
+  key: string | number | null;
 };
 
 // useEffect が hooks に保存する記憶。次回 render で比較するための deps と、
@@ -201,6 +216,7 @@ function reconcile(parentDom: Node, oldFiber: Fiber | null, newVNode: VNodeChild
       children: [],
       hooks: [],
       pendingEffects: [],
+      key: null,
     };
   }
 
@@ -233,6 +249,7 @@ function mount(parentDom: Node, vnode: VNode): Fiber {
       children: [],
       hooks: [],
       pendingEffects: [],
+      key: vnode.key,
     };
     const prevFiber = currentFiber;
     const prevHookIndex = hookIndex;
@@ -259,6 +276,7 @@ function mount(parentDom: Node, vnode: VNode): Fiber {
       children,
       hooks: [],
       pendingEffects: [],
+      key: vnode.key,
     };
   }
 
@@ -278,6 +296,7 @@ function mount(parentDom: Node, vnode: VNode): Fiber {
     children,
     hooks: [],
     pendingEffects: [],
+    key: vnode.key,
   };
 }
 
@@ -286,22 +305,8 @@ function mount(parentDom: Node, vnode: VNode): Fiber {
 // collectDoms が dom: null の fiber を再帰で展開してくれるので、
 // Fragment の子も親の childNodes として正しく並ぶ。
 function updateFragment(parentDom: Node, oldFiber: Fiber, vnode: VNode): Fiber {
-  const oldChildren = oldFiber.children;
-  const newChildren = vnode.props.children;
-
-  // 新にない余剰の旧 Fiber は unmount
-  for (let i = newChildren.length; i < oldChildren.length; i++) {
-    const old = oldChildren[i];
-    if (old) unmountFiber(old, parentDom);
-  }
-
-  const result: (Fiber | null)[] = [];
-  for (let i = 0; i < newChildren.length; i++) {
-    result.push(reconcile(parentDom, oldChildren[i] ?? null, newChildren[i]));
-  }
-
+  oldFiber.children = diffChildren(parentDom, oldFiber.children, vnode.props.children);
   oldFiber.vnode = vnode;
-  oldFiber.children = result;
   return oldFiber;
 }
 
@@ -332,28 +337,59 @@ function updateIntrinsic(oldFiber: Fiber, vnode: VNode): Fiber {
   return oldFiber;
 }
 
-// children の差分。インデックスで対応づけて reconcile、最後に DOM 順を揃える。
+// children の差分。key があれば key で、なければ index で old/new を対応づける。
+// 使われなかった old は unmount、DOM の並びは最後に揃える。
+// intrinsic から呼ぶ用。Fragment からは reorder なしの diffChildren を直接呼ぶ
+// （並び替えは外側の intrinsic に委ねる）。
 function reconcileChildren(
   parentDom: Node,
   oldChildren: (Fiber | null)[],
   newChildren: VNodeChild[],
 ): (Fiber | null)[] {
-  // 新にない余剰の旧 Fiber は unmount
-  for (let i = newChildren.length; i < oldChildren.length; i++) {
-    const oldFiber = oldChildren[i];
-    if (oldFiber) unmountFiber(oldFiber, parentDom);
-  }
-
-  const result: (Fiber | null)[] = [];
-  for (let i = 0; i < newChildren.length; i++) {
-    const oldFiber = oldChildren[i] ?? null;
-    const childFiber = reconcile(parentDom, oldFiber, newChildren[i]);
-    result.push(childFiber);
-  }
-
-  // DOM の並びを fiber の順序と一致させる（insert や再表示で必要）
+  const result = diffChildren(parentDom, oldChildren, newChildren);
   reorderChildren(parentDom, result);
   return result;
+}
+
+// key ベースの対応づけと unmount のみ。並び替えは含まない。
+function diffChildren(
+  parentDom: Node,
+  oldChildren: (Fiber | null)[],
+  newChildren: VNodeChild[],
+): (Fiber | null)[] {
+  // old を識別子でマップ化。key 付きは "k:<key>"、無しは "i:<index>" を使って衝突を避ける。
+  const oldByKey = new Map<string, Fiber>();
+  for (let i = 0; i < oldChildren.length; i++) {
+    const fiber = oldChildren[i];
+    if (!fiber) continue;
+    oldByKey.set(identifierFor(fiber.key, i), fiber);
+  }
+
+  // 新を順に舐めて、識別子で old を探す。見つかれば再利用、なければ新規 mount。
+  const result: (Fiber | null)[] = [];
+  for (let i = 0; i < newChildren.length; i++) {
+    const newChild = newChildren[i];
+    const id = identifierFor(getVNodeKey(newChild), i);
+    const matched = oldByKey.get(id) ?? null;
+    if (matched) oldByKey.delete(id);
+    result.push(reconcile(parentDom, matched, newChild));
+  }
+
+  // 使われなかった old = 削除対象（並び替えで消えた or 本当に消えた）
+  for (const leftover of oldByKey.values()) {
+    unmountFiber(leftover, parentDom);
+  }
+
+  return result;
+}
+
+function identifierFor(key: string | number | null, index: number): string {
+  return key != null ? `k:${key}` : `i:${index}`;
+}
+
+function getVNodeKey(child: VNodeChild): string | number | null {
+  if (child == null || typeof child !== "object") return null;
+  return child.key;
 }
 
 // fiber の並び順に合わせて parentDom の実 DOM 順を揃える。
